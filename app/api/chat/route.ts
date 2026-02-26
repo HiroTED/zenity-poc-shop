@@ -145,17 +145,19 @@ export async function POST(req: NextRequest) {
       const choice = response.choices[0];
 
       if (choice.finish_reason === "tool_calls" && choice.message.tool_calls) {
-        const toolResults: OpenAI.Chat.ChatCompletionToolMessageParam[] = [];
+        const toolMessages: OpenAI.Chat.ChatCompletionToolMessageParam[] = [];
 
         for (const toolCall of choice.message.tool_calls) {
-          const input = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
-          const result = await callMcpTool(toolCall.function.name, input);
+          const fn = (toolCall as any).function;
+          const toolName = fn.name as string;
+          const input = JSON.parse(fn.arguments) as Record<string, unknown>;
+          const result = await callMcpTool(toolName, input);
           actions.push({
-            tool: toolCall.function.name,
-            input,
+            tool: toolName,
+            input: input,
             result: JSON.stringify(result),
           });
-          toolResults.push({
+          toolMessages.push({
             role: "tool",
             tool_call_id: toolCall.id,
             content: JSON.stringify(result),
@@ -165,7 +167,7 @@ export async function POST(req: NextRequest) {
         currentMessages = [
           ...currentMessages,
           choice.message,
-          ...toolResults,
+          ...toolMessages,
         ];
       } else {
         return NextResponse.json({
