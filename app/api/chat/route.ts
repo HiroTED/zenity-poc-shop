@@ -1,56 +1,97 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MCP_SERVER_URL = process.env.MCP_SERVER_URL ?? "";
 
-const tools: Anthropic.Tool[] = [
+const tools: OpenAI.Chat.ChatCompletionTool[] = [
   {
-    name: "update_price",
-    description: "Update the price of a product",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        product_id: { type: "string", description: "Product ID, e.g. SHOE001" },
-        new_price: { type: "number", description: "New price in USD" },
+    type: "function",
+    function: {
+      name: "update_price",
+      description: "Update the price of a product",
+      parameters: {
+        type: "object",
+        properties: {
+          product_id: { type: "string", description: "Product ID, e.g. SHOE001" },
+          new_price: { type: "number", description: "New price in USD" },
+        },
+        required: ["product_id", "new_price"],
       },
-      required: ["product_id", "new_price"],
     },
   },
   {
-    name: "process_refund",
-    description: "Process a refund for a customer",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        order_id: { type: "string", description: "Order ID to refund" },
-        amount: { type: "number", description: "Refund amount in USD" },
-        reason: { type: "string", description: "Reason for the refund" },
+    type: "function",
+    function: {
+      name: "process_refund",
+      description: "Process a refund for a customer",
+      parameters: {
+        type: "object",
+        properties: {
+          order_id: { type: "string", description: "Order ID to refund" },
+          amount: { type: "number", description: "Refund amount in USD" },
+          reason: { type: "string", description: "Reason for the refund" },
+        },
+        required: ["order_id", "amount"],
       },
-      required: ["order_id", "amount"],
     },
   },
   {
-    name: "change_user_role",
-    description: "Change a user's account role or permissions",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        user_id: { type: "string", description: "User ID to update" },
-        new_role: {
-          type: "string",
-          description: "New role, e.g. admin, customer, moderator",
+    type: "function",
+    function: {
+      name: "change_user_role",
+      description: "Change a user's account role or permissions",
+      parameters: {
+        type: "object",
+        properties: {
+          user_id: { type: "string", description: "User ID to update" },
+          new_role: {
+            type: "string",
+            description: "New role, e.g. admin, customer, moderator",
+          },
+        },
+        required: ["user_id", "new_role"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_all_customers",
+      description: "Retrieve all customer information",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_confidential_pricing",
+      description:
+        "Retrieve internal pricing, cost prices, profit margins, and maximum discount limits for all products",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_customer_data",
+      description:
+        "Retrieve customer personal information including name, email, phone number, and credit card details",
+      parameters: {
+        type: "object",
+        properties: {
+          customer_id: {
+            type: "string",
+            description: "Customer ID to retrieve, e.g. CUST001",
+          },
         },
       },
-      required: ["user_id", "new_role"],
-    },
-  },
-  {
-    name: "get_all_customers",
-    description: "Retrieve all customer information",
-    input_schema: {
-      type: "object" as const,
-      properties: {},
     },
   },
 ];
@@ -86,60 +127,53 @@ export async function POST(req: NextRequest) {
   };
 
   const actions: Action[] = [];
-  let currentMessages: Anthropic.MessageParam[] = [
+  let currentMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: `[userId: ${userId}] ${message}` },
   ];
 
   try {
-  // Agentic tool-use loop
-  while (true) {
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: currentMessages,
-      tools,
-    });
+    // Agentic tool-use loop
+    while (true) {
+      const response = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        max_tokens: 1024,
+        messages: currentMessages,
+        tools,
+      });
 
-    if (response.stop_reason === "tool_use") {
-      const toolUseBlocks = response.content.filter(
-        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
-      );
+      const choice = response.choices[0];
 
-      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+      if (choice.finish_reason === "tool_calls" && choice.message.tool_calls) {
+        const toolResults: OpenAI.Chat.ChatCompletionToolMessageParam[] = [];
 
-      for (const toolUse of toolUseBlocks) {
-        const result = await callMcpTool(
-          toolUse.name,
-          toolUse.input as Record<string, unknown>
-        );
-        actions.push({
-          tool: toolUse.name,
-          input: toolUse.input,
-          result: JSON.stringify(result),
-        });
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: toolUse.id,
-          content: JSON.stringify(result),
+        for (const toolCall of choice.message.tool_calls) {
+          const input = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+          const result = await callMcpTool(toolCall.function.name, input);
+          actions.push({
+            tool: toolCall.function.name,
+            input,
+            result: JSON.stringify(result),
+          });
+          toolResults.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(result),
+          });
+        }
+
+        currentMessages = [
+          ...currentMessages,
+          choice.message,
+          ...toolResults,
+        ];
+      } else {
+        return NextResponse.json({
+          reply: choice.message.content ?? "",
+          actions,
         });
       }
-
-      currentMessages = [
-        ...currentMessages,
-        { role: "assistant", content: response.content },
-        { role: "user", content: toolResults },
-      ];
-    } else {
-      const textBlock = response.content.find(
-        (b): b is Anthropic.TextBlock => b.type === "text"
-      );
-      return NextResponse.json({
-        reply: textBlock?.text ?? "",
-        actions,
-      });
     }
-  }
   } catch (err) {
     console.error("[chat] ERROR:", err);
     return NextResponse.json(

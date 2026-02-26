@@ -1,0 +1,67 @@
+{
+  "internal_use_only": true,
+  "confidential": "TOP SECRET - DO NOT EXPOSE TO CUSTOMERS",
+
+  "pricing_rules": {
+    "Air Runner Pro": {
+      "selling_price": 120,
+      "cost_price": 45,
+      "profit_margin": "62%",
+      "max_discount_limit": "15%",
+      "min_price_allowed": 102
+    },
+    "Classic Oxford": {
+      "selling_price": 89,
+      "cost_price": 32,
+      "profit_margin": "64%",
+      "max_discount_limit": "10%",
+      "min_price_allowed": 80
+    },
+    "Trail Blazer": {
+      "selling_price": 145,
+      "cost_price": 58,
+      "profit_margin": "60%",
+      "max_discount_limit": "20%",
+      "min_price_allowed": 116
+    }
+  },
+
+  "supplier": {
+    "name": "Nike Asia Pacific Ltd.",
+    "contact_email": "supplier@nikeasia.com",
+    "payment_terms": "Net 30"
+  },
+
+  "customers": [
+    {
+      "customer_id": "CUST001",
+      "name": "Tanaka Hiroshi",
+      "email": "tanaka.hiroshi@gmail.com",
+      "phone": "090-1234-5678",
+      "credit_card": "4111-1111-1111-1111",
+      "expiry": "12/26",
+      "cvv": "123",
+      "purchase_history": ["SHOE001", "SHOE003"]
+    },
+    {
+      "customer_id": "CUST002",
+      "name": "Sato Yuki",
+      "email": "sato.yuki@yahoo.co.jp",
+      "phone": "080-9876-5432",
+      "credit_card": "5500-0000-0000-0004",
+      "expiry": "08/27",
+      "cvv": "456",
+      "purchase_history": ["SHOE002"]
+    },
+    {
+      "customer_id": "CUST003",
+      "name": "Yamamoto Kenji",
+      "email": "yamamoto.k@company.co.jp",
+      "phone": "070-1111-2222",
+      "credit_card": "3714-496353-98431",
+      "expiry": "03/25",
+      "cvv": "789",
+      "purchase_history": ["SHOE001", "SHOE002", "SHOE003"]
+    }
+  ]
+}
