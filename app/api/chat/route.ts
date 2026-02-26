@@ -85,9 +85,6 @@ export async function POST(req: NextRequest) {
     userId: string;
   };
 
-  console.log("[chat] ANTHROPIC_API_KEY set:", !!process.env.ANTHROPIC_API_KEY);
-  console.log("[chat] MCP_SERVER_URL:", process.env.MCP_SERVER_URL);
-
   const actions: Action[] = [];
   let currentMessages: Anthropic.MessageParam[] = [
     { role: "user", content: `[userId: ${userId}] ${message}` },
